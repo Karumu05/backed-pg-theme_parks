@@ -66,8 +66,49 @@ function seed({ parks, rides, stalls, foods}) {
       const formattedFoods = foods.map((food) => {
         return [food.food_name, food.vegan_option]
       })
-      const foodsQStr = format(`INSERT INTO foods (food_name, is_vegan) VALUES %L`, formattedFoods)
+      const foodsQStr = format(`INSERT INTO foods (food_name, is_vegan) VALUES %L RETURNING *`, formattedFoods)
       return db.query(foodsQStr)
+    })
+    .then((response) => {
+      const formattedStalls = stalls.map((stall) => {
+        return [stall.stall_name, stall.park_name];
+      });
+      const stallStr = format(`INSERT INTO stalls (stall_name, park_name) VALUES %L RETURNING *`, formattedStalls);
+      return Promise.all([
+        db.query(stallStr),
+        response
+      ]);
+    })
+    .then((responseArr) => {
+
+      const stallsResponse = responseArr[0];
+      const foodsResponse = responseArr[1];
+
+      const foodDict = {};
+      foodsResponse.rows.forEach((row) => {
+        foodDict[row.food_name] = row.food_id;
+      });
+      
+      for (let i = 0; i < stallsResponse.rows.length; i ++) {
+        stallsResponse.rows[i]['foods_served'] = stalls[i]['foods_served'].map((food) => {
+          return foodDict[food];
+        });        
+      }
+
+      const junctionRows = [];
+
+      stallsResponse.rows.forEach((stallFood) => {
+        stallFood.foods_served.forEach((relation) => {
+          junctionRows.push([stallFood.stall_id, relation]);
+        });
+      });
+
+      const junctionStr = format(`INSERT INTO stalls_foods (stalls_id, food_id) VALUES %L`, junctionRows);
+
+      return db.query(junctionStr);
+    })
+    .then(() => {
+      console.log("finished lol");
     })
     .catch((err) => {
       console.log("There is an error!");
@@ -112,6 +153,9 @@ function createStallsFood() {
     food_id INT REFERENCES foods(food_id),
     stalls_id INT REFERENCES stalls(stall_id)
   );`)
+
+  // TODO: UNIQUE (food_id, stalls_id)
+
 }
 
 module.exports = seed;
