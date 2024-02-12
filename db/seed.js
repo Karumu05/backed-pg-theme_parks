@@ -2,17 +2,17 @@ const db = require("./connection");
 const format = require("pg-format");
 // const { parks, rides, stalls } = require("./data/index.js");
 
-function seed({ parks, rides, stalls }) {
+function seed({ parks, rides, stalls, foods}) {
   return db
     .query("DROP TABLE IF EXISTS rides;")
     .then(() => {
-      return db.query("DROP TABLE IF EXISTS stalls;");
+      return db.query("DROP TABLE IF EXISTS stalls CASCADE;");
     })
     .then(() => {
-      return db.query("DROP TABLE IF EXISTS foods;");
+      return db.query("DROP TABLE IF EXISTS foods CASCADE;");
     })
     .then(() => {
-      return db.query("DROP TABLE IF EXISTS stalls_foods;");
+      return db.query("DROP TABLE IF EXISTS stalls_foods CASCADE;");
     })
     .then(() => {
       return db.query("DROP TABLE IF EXISTS parks;");
@@ -27,32 +27,47 @@ function seed({ parks, rides, stalls }) {
       const formattedData = parks.map((park) => {
         return [park.park_name, park.year_opened, park.annual_attendance];
       });
-      const queryString = format(`INSERT INTO parks (park_name, year_opened, annual_attendance) VALUES %L RETURNING *`, formattedData);
+      const queryString = format(
+        `INSERT INTO parks (park_name, year_opened, annual_attendance) VALUES %L RETURNING *`,
+        formattedData
+      );
       return db.query(queryString);
     })
     .then((result) => {
-      
-      console.log(result.rows);
-      
-      // ALTER TABLE table_name 
-      // DROP COLUMN column_name;
-
       const dict = {};
       result.rows.forEach((row) => {
         dict[row.park_name] = row.park_id;
       });
 
-      rides.map((ride) => {
-        const thisRide = { ...ride, 'park_id': dict[ride['park_name']] };
-        delete thisRide.park_name;
-        return thisRide;
+      const formattedRides = rides.map((ride) => {
+        return [
+          ride.ride_name,
+          ride.year_opened,
+          dict[ride.park_name],
+          ride.votes,
+        ];
       });
-
-      db.query(`ALTER TABLE rides
-      ADD park_id INT REFERENCES park(park_id) ON DELETE CASCADE;`);
-
-      
-
+      const queryRidesString = format(
+        `INSERT INTO rides (ride_name, year_opened, park_id, votes) VALUES %L`,
+        formattedRides
+      );
+      return db.query(queryRidesString);
+    })
+    .then(() => {
+      return createFoods()
+    })
+    .then(() => {
+      return createStalls()
+    })
+    .then(() => {
+      return createStallsFood()
+    })
+    .then(() => {
+      const formattedFoods = foods.map((food) => {
+        return [food.food_name, food.vegan_option]
+      })
+      const foodsQStr = format(`INSERT INTO foods (food_name, is_vegan) VALUES %L`, formattedFoods)
+      return db.query(foodsQStr)
     })
     .catch((err) => {
       console.log("There is an error!");
@@ -61,7 +76,6 @@ function seed({ parks, rides, stalls }) {
 }
 
 function createParks() {
-  /* Create your parks table in the query below */
   return db.query(`CREATE TABLE parks (
                     park_id SERIAL PRIMARY KEY,
                     park_name VARCHAR(255) NOT NULL,
@@ -76,6 +90,28 @@ function createRides() {
     ride_name VARCHAR(255) NOT NULL,
     year_opened INT NOT NULL,
     votes INT DEFAULT 0);`);
+}
+
+function createFoods() {
+  return db.query(`CREATE TABLE foods (
+    food_id SERIAL PRIMARY KEY,
+    food_name VARCHAR(225),
+    is_vegan BOOLEAN NOT NULL);`);
+}
+
+function createStalls() {
+  return db.query(`CREATE TABLE stalls (
+    stall_id SERIAL PRIMARY KEY,
+    stall_name VARCHAR(225),
+    park_name VARCHAR(225));`);
+}
+
+function createStallsFood() {
+  return db.query(`CREATE TABLE stalls_foods (
+    stalls_food_id SERIAL PRIMARY KEY,
+    food_id INT REFERENCES foods(food_id),
+    stalls_id INT REFERENCES stalls(stall_id)
+  );`)
 }
 
 module.exports = seed;
