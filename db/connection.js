@@ -1,17 +1,6 @@
 const { Pool } = require('pg'); 
 
-/**
- * Create your connection to the DB in this file
- * and remember to export it
- */
-
-/*
-
-{
-    PGDATABASE: process.env.PGDATABASE 
-}
-
-*/
+//need to set the database and have a if statement to say an error if not avaliable
 
 const db = new Pool();
 

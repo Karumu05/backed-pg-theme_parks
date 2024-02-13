@@ -1,6 +1,6 @@
 const db = require("./connection");
 const format = require("pg-format");
-// const { parks, rides, stalls } = require("./data/index.js");
+
 
 function seed({ parks, rides, stalls, foods}) {
   return db
@@ -108,7 +108,7 @@ function seed({ parks, rides, stalls, foods}) {
       return db.query(junctionStr);
     })
     .then(() => {
-      console.log("finished lol");
+      console.log("Database has been re-seeded!");
     })
     .catch((err) => {
       console.log("There is an error!");
